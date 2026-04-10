@@ -190,6 +190,22 @@ body > *:not(.modal-overlay) { display: none !important; }
   padding: 4px 10px; font-size: 0.78rem; cursor: pointer;
 }
 .user-badge:hover { background: rgba(255,255,255,0.3); }
+
+.btn-send {
+  flex: 1; background: #868c5f; color: white; border: none;
+  border-radius: 11px; padding: 13px; font-size: 0.95rem; font-weight: 600;
+  font-family: 'Sarabun', sans-serif; cursor: pointer;
+}
+.btn-send:hover { background: #4a5230; }
+.btn-send:disabled { background: #c5c9a8; cursor: not-allowed; }
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: #4a5230; color: white; padding: 10px 22px; border-radius: 99px;
+  font-size: 0.88rem; font-family: 'Sarabun', sans-serif; z-index: 500;
+  transition: transform 0.3s ease; white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.error { background: #c1121f; }
 </style>
 
 </head>
@@ -298,6 +314,7 @@ body > *:not(.modal-overlay) { display: none !important; }
   <div class="actions">
     <button class="btn-outline" onclick="previewBill()">👁 ดูตัวอย่าง</button>
     <button class="btn-main" onclick="saveBill()">💾 บันทึกบิล</button>
+    <button class="btn-send" onclick="saveBill(true)">📤 บันทึก + ส่ง Sheets</button>
   </div>
 </div>
 
@@ -412,6 +429,51 @@ function applyUserProfile() {
   }
 }
 
+
+// ===== Google Sheets Integration =====
+const APPS_SCRIPT_URL = ''; // ใส่ URL จาก Apps Script deployment ตรงนี้
+
+function showToast(msg, isError=false) {
+  let t = document.getElementById('mainToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'mainToast';
+    t.className = 'toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function sendToSheets(bill) {
+  if (!APPS_SCRIPT_URL) {
+    showToast('⚠️ ยังไม่ได้ตั้งค่า Apps Script URL', true);
+    return false;
+  }
+  try {
+    const prefix = localStorage.getItem('kitchen_prefix') || '';
+    const payload = { ...bill, prefix };
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.status === 'ok') {
+      showToast('✅ ส่งข้อมูลไป Google Sheets แล้ว');
+      return true;
+    } else {
+      showToast('❌ ส่งไม่สำเร็จ: ' + json.message, true);
+      return false;
+    }
+  } catch(err) {
+    showToast('❌ เชื่อมต่อไม่ได้: ' + err.message, true);
+    return false;
+  }
+}
+
 window.onload = () => {
   const today = new Date().toISOString().split('T')[0];
   const dateEl = document.getElementById('billDate');
@@ -491,7 +553,7 @@ function getItems() {
   }).filter(Boolean);
 }
 
-function saveBill() {
+async function saveBill(sendSheets=false) {
   const company = document.getElementById('company').value.trim();
   const vendor = document.getElementById('vendorName').value.trim();
   const billDate = document.getElementById('billDate').value;
@@ -513,7 +575,14 @@ function saveBill() {
   if(company) localStorage.setItem('kitchen_company', company);
   if(buyerName) localStorage.setItem('kitchen_buyer', buyerName);
   localStorage.setItem('kitchen_prefix', prefix);
-  alert('✅ บันทึกบิลเรียบร้อยแล้ว!');
+  if (sendSheets) {
+    const btnSend = document.querySelector('.btn-send');
+    if (btnSend) { btnSend.disabled = true; btnSend.textContent = '📤 กำลังส่ง...'; }
+    await sendToSheets(bill);
+    if (btnSend) { btnSend.disabled = false; btnSend.textContent = '📤 บันทึก + ส่ง Sheets'; }
+  } else {
+    showToast('✅ บันทึกบิลแล้ว');
+  }
   document.getElementById('vendorName').value='';
   document.getElementById('signerName').value='';
   updateBillNo();
