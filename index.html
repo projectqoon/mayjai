@@ -580,7 +580,9 @@ async function saveBill(sendSheets=false) {
   const today = new Date().toISOString().split('T')[0];
   if(billDate !== today) { alert('❌ ไม่สามารถบันทึกบิลย้อนหลังได้\nกรุณาใช้วันที่ปัจจุบันเท่านั้น'); return; }
   const total = items.reduce((s,i)=>s+i.sub,0);
-  const bill = { id:Date.now(), company, vendor, billDate, billNo, category, items, total, signerName, buyerName, sig:sigData };
+  // ดึง sig จาก canvas โดยตรง ณ เวลาที่กด save
+  const currentSig = compressSig(canvas);
+  const bill = { id:Date.now(), company, vendor, billDate, billNo, category, items, total, signerName, buyerName, sig:currentSig };
   bills.unshift(bill);
   localStorage.setItem('kitchen_bills', JSON.stringify(bills));
   if(company) localStorage.setItem('kitchen_company', company);
