@@ -374,8 +374,19 @@ canvas.addEventListener('mousedown', e => { drawing=true; const p=getPos(e); las
 canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const p=getPos(e); lastX=p.x; lastY=p.y; }, {passive:false});
 canvas.addEventListener('mousemove', e => { if(!drawing) return; stroke(e); });
 canvas.addEventListener('touchmove', e => { e.preventDefault(); if(!drawing) return; stroke(e); }, {passive:false});
-['mouseup','mouseleave'].forEach(ev => canvas.addEventListener(ev, () => { drawing=false; sigData=canvas.toDataURL(); }));
-canvas.addEventListener('touchend', () => { drawing=false; sigData=canvas.toDataURL(); });
+['mouseup','mouseleave'].forEach(ev => canvas.addEventListener(ev, () => { drawing=false; sigData=compressSig(canvas); }));
+canvas.addEventListener('touchend', () => { drawing=false; sigData=compressSig(canvas); });
+
+function compressSig(src) {
+  // บีบลง 200x60 JPEG 50% — ลดจาก ~100KB เหลือ ~8KB ให้พอดี Sheets cell limit
+  const sm = document.createElement('canvas');
+  sm.width = 200; sm.height = 60;
+  const sc = sm.getContext('2d');
+  sc.fillStyle = '#ffffff';
+  sc.fillRect(0, 0, 200, 60);
+  sc.drawImage(src, 0, 0, 200, 60);
+  return sm.toDataURL('image/jpeg', 0.5);
+}
 
 function stroke(e) {
   const p = getPos(e);
